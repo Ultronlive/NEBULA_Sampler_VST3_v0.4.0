@@ -1,0 +1,36 @@
+name: Build NEBULA VST3 for Windows x64
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'CMakeLists.txt'
+      - 'Source/**'
+      - '.github/workflows/build-vst3-windows.yml'
+jobs:
+  vst3:
+    runs-on: windows-2022
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure CMake / JUCE 8
+        shell: pwsh
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+      - name: Build VST3 (Release)
+        shell: pwsh
+        run: cmake --build build --config Release --target NEBULASampler_VST3 --parallel 4
+      - name: Stage binary + demo banks
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          $vst3 = Get-ChildItem -Path build -Filter "NEBULA Sampler.vst3" -Recurse -Directory | Select-Object -First 1
+          if (-not $vst3) { throw "VST3 bundle was not produced" }
+          Copy-Item $vst3.FullName -Destination release -Recurse
+          Copy-Item Assets -Destination release -Recurse
+          Copy-Item Docs -Destination release -Recurse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NEBULA-Sampler-VST3-Windows-x64
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
